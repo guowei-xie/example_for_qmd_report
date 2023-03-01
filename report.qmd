@@ -116,12 +116,12 @@ dat %>%
     left_join(m_dat, by = "gho_display") %>% 
     ggplot() +
     geom_vline(xintercept = 1, linetype='solid')+
-    geom_vline(xintercept = 2, linetype='solid')+
+    geom_vline(xintercept = 1.5, linetype='solid')+
     geom_point(aes(x = 1, y = Female), fill = "lightblue", color = "grey",size = 2, shape = 21)+
-    geom_point(aes(x = 2, y = Male), fill = "lightblue",color = "grey",size = 2, shape = 21)+
-    geom_segment(aes(x=1, xend=2, y = Female, yend= Male), size = .3, color = "grey")+
-    geom_text(aes(x = 1, y = 1, label = "Female"))+
-    geom_text(aes(x = 2, y = 1, label = "Male")) +
+    geom_point(aes(x = 1.5, y = Male), fill = "lightblue",color = "grey",size = 2, shape = 21)+
+    geom_segment(aes(x=1, xend=1.5, y = Female, yend= Male), size = .3, color = "grey")+
+    geom_text(aes(x = 1.05, y = 1, label = "Female"))+
+    geom_text(aes(x = 1.55, y = 1, label = "Male")) +
     geom_hline(aes(yintercept = m_value), lty = 4, col = "salmon")+
     facet_grid(~ gho_display)+
      labs(
@@ -133,6 +133,15 @@ dat %>%
 
 4. 扩展第三道题目，比较1990年至2013年间各个东亚国家在出生时预期寿命方面的进步情况（如图2）。
 ```{r plt2}
+m_dat <- dat %>% 
+    filter(region_display == "South_East Asia",
+           gho_display == "Life expectancy at birth (years)",
+           year_code %in% c("1990","2013")) %>% 
+    group_by(year_code) %>% 
+    summarise(
+        m_value_year = mean(value)
+    ) %>% 
+    ungroup()
 
 dat %>% 
     filter(region_display == "South_East Asia",
@@ -143,13 +152,17 @@ dat %>%
         m_value = mean(value)
     ) %>% 
     ungroup() %>%
- 
-    ggplot(aes(x = m_value, y = country_display, color = year_code))+
-    geom_point()+
-    geom_line()+
+    left_join(m_dat, by = "year_code") %>% 
+    ggplot(aes(x = m_value, y = country_display, fill = as.factor(year_code)))+
+    geom_point(size = 2, shape = 21)+
+    geom_line(aes(group = country_display))+
+    geom_vline(aes(xintercept = m_value_year), lty = 4, col = "salmon")+
     labs(
-        x = ""
-    )
+        x = "",
+        y = "",
+        title = "Life Expectancy Bir th"
+    )+
+    theme(legend.title = element_blank())
     
 
 
