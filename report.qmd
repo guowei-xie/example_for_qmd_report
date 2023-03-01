@@ -22,21 +22,9 @@ editor_options:
  
 ---
 
-# 背景
 
-这是一次数据分析考试，我需要对给定的数据集进行探索分析，以回答下述问题：
 
-1.  请问哪个城市的人口数量最多？
-2.  前三大人口数量最多的城市是？
-3.  探索GDP与污染程度的相关性
-4.  比较北京与山东省的污染程度
-5.  城市在污染程度的差异显著性?
 
-# 结论
-
-{{< pagebreak >}}
-
-# 探索分析
 
 ```{r setup}
 library(tidyverse)
@@ -44,235 +32,121 @@ library(gt)
 library(reshape2)
 library(factoextra)
 library(fmsb)
+library(jsonlite)
 ```
 
-```{r Pre-processing, include=FALSE}
-dat1 <- read.csv("Datasets/CompletedDataset.csv")
 
-#summary(dat1)
-# dat1 %>% 
-#     count(City) %>% 
-#     filter(n >= 2)
-# dat1 %>% filter(City == "Taizhou City")
-# Taizhou City 有两条不同数据，2条都删除
-dat1 <- dat1 %>%
-    filter(City != "Taizhou City")
+```{r data}
+codes <- read.csv("Datasets/codes.csv")
+displays <- read.csv("Datasets/displays.csv")
+values <- fromJSON("Datasets/values.json")
+values <- as.data.frame(values[["data"]])
 
+
+dat <- codes %>% 
+    left_join(displays, by = c("gho_code" = "gho_code",
+                               "country_code" = "country_code",
+                               "region_code" = "region_code",
+                               "sex_code" = "sex_code",
+                               "world_bank_income_group_group_code" = "world_bank_income_group_group_code"
+                               )) %>%
+    left_join(values, by = c("id" = "id"))
 ```
 
-## 城市与人口
-
-```{r top1}
-dat1_sort <- dat1 %>% 
-    arrange(desc(PopulationDensity))
-```
-
-我国人口最多的城市为`r dat1_sort$City[1]`,人口数量排名Top3城市如下：
-
-```{r tbl_top3}
-dat1_sort %>% 
-    head(3) %>% 
-    select(City, PopulationDensity) %>% 
+1. 根据最新数据（2013），统计各个地区 (region) 的 60岁时预期寿命区间 
+```{r tbl_1}
+dat %>%
+    filter(gho_display == "Life expectancy at age 60 (years)",
+           year_code == "2013") %>% 
+    group_by(region_display) %>% 
+    summarise(
+        Min = min(value, na.rm = TRUE),
+        Max = max(value, na.rm = TRUE)
+    ) %>% 
+    ungroup %>% 
+    select(region_display, Min, Max) %>% 
     gt() %>% 
-    tab_header(title = "TOP3人口城市") %>% 
     cols_label(
-        City = "城市名称",
-        PopulationDensity = "人口数量"
+        region_display = "region"
     )
 ```
 
-## 相关性探索(AQI与GDP)
+2. 根据1990年的数据，统计了各个国家男女性别在 出生时预期寿命 上的差距，由高到低排序。
+列出排名前三（差距最大）与倒数前三（差距最小）的国家。
+```{r tbl_2}
+diff_sort <- dat %>% 
+    filter(year_code == "1990",
+          gho_display == "Life expectancy at birth (years)" ) %>% 
+    group_by(country_code, country_display) %>% 
+    summarise(
+        Female = sum(ifelse(sex_code == "FMLE", value, 0)),
+        Male = sum(ifelse(sex_code == "MLE", value, 0)),
+    ) %>% 
+    ungroup() %>% 
+    mutate(Diff = abs(Female - Male)) %>% 
+    arrange(desc(Diff))
 
+# 前三名
+diff_sort_top3 <- diff_sort %>% 
+    head(3)
 
-```{r cor}
-dat1_cor <- dat1 %>% 
-    select(- City) %>% 
-    cor() %>% 
-    round(2) %>% 
-    melt()
-```
+# 后三名
+diff_sort_last3 <- diff_sort %>% 
+    tail(3)
 
-在进行探索前，我们的初步假设是随着城市经济的发展（GDP提升），城市污染也会随之加剧（AQI升高），但由下图可见，从各城市整体来看，AQI与GDP之间并无直接的强相关性（相关系数为：`r dat1_cor %>% filter(Var1=="AQI"&Var2=="GDP") %>% .$value`）
-
-```{r plt_heatmap}
-# 相关系数热力图
-dat1_cor %>% 
-    ggplot(aes(x = Var1, y = Var2, fill = value, label = value))+
-    geom_tile()+
-    geom_text()+
-    scale_fill_gradient2(low="#2b8cbe", high="#d95f0e", mid="white")+
-    theme(axis.text.x = element_text(
-        angle = 45,
-        margin = margin(t = .8,
-                        r = 0,
-                        b = 0,
-                        l = 0,'cm')))+
-    labs(
-        title = "相关系数热力图",
-        subtitle = "pearson",
-        x = "",
-        y = ""
-    )
+rbind(diff_sort_top3, diff_sort_last3) %>% gt()
     
 ```
 
-绘制各城市AQI与GDP分布图发现，AQI与GDP间虽不具有强相关性，但仍存在一定的模式：
+3. 不区分性别，针对东亚区域 (South_East Asia) ，对比男女在 出生时预期寿命 以及 60岁时预期寿命 的差距。（请尝试利用图表表达，如图1）
+```{r plt1}
 
-*   在低GDP(<1000)水平城市群中存在较明显的正相关性；
-*   对GDP进行对数转换后，可发现线性关系，且高降水量城市多位于曲线下方;
-
-```{r plt_aqi_gdp}
-# 城市aqi~gdp分布图
-dat1 %>% 
-    ggplot(aes(x = GDP, y = AQI))+
-    geom_point(alpha = .5)+
-    geom_smooth(color = "black")+
-    geom_smooth(method = lm, 
-                data = filter(dat1,GDP<=1000), 
-                color = "red", se = FALSE)+
-    labs(
-        title = "城市AQI~GDP分布"
+dat %>% 
+    filter(region_display == "South_East Asia",
+           gho_display %in% c("Life expectancy at birth (years)", "Life expectancy at age 60 (years)")) %>% 
+    group_by(country_display, gho_display) %>% 
+    summarise(
+        Female = mean(ifelse(sex_code == "FMLE", value, NA), na.rm = TRUE),
+        Male = mean(ifelse(sex_code == "MLE", value, NA), na.rm = TRUE),
+    ) %>% 
+    ungroup() %>% 
+    ggplot() +
+    geom_vline(xintercept = 1, linetype='solid')+
+    geom_vline(xintercept = 2, linetype='solid')+
+    geom_point(aes(x = 1, y = Female), color = "lightblue")+
+    geom_point(aes(x = 2, y = Male), color = "lightblue")+
+    geom_segment(aes(x=1, xend=2, y = Female, yend= Male), size = .3)+
+    geom_text(aes(x = 1, y = 1, label = "Female"))+
+    geom_text(aes(x = 2, y = 1, label = "Male")) +
+    facet_grid(~ gho_display)+
+     labs(
+        x = ""
     )
-    
+
 ```
 
+4. 扩展第三道题目，比较1990年至2013年间各个东亚国家在出生时预期寿命方面的进步情况（如图2）。
+```{r plt2}
 
-```{r plt_log10_gdp}
-# 城市aqi~gdp以及降水量分布图
-dat1 %>% 
-    ggplot(aes(x = log10(GDP), y = AQI, color = Precipitation))+
-    geom_point(alpha = 1)+
-    geom_smooth(se = FALSE, color = "black")+
-    # geom_smooth(data = filter(dat1, Coastal == 0), color = "red", se = FALSE)
-    labs(
-        title = "城市AQI~log10(GDP)及降雨量分布",
-    )
-```
-故提出新的假设： GPD增长会对AQI造成影响，但因其他因素干扰导致最终相关性不明显（比如降水会减轻GDP增长对AQI带来的影响）。
-
-对城市特征进行K-means聚类，聚类分布及结果如下：
-```{r plt_km}
-dat1_scale <- scale(select(dat1, - City))
-km <- kmeans(dat1_scale, centers = 4, nstart = 25)
-fviz_cluster(km, 
-             data = dat1_scale, 
-             geom = "point", 
-             xlab = "", 
-             ylab = "")
-```
-
-```{r tbl_km}
-set.seed(42)
-dat1_cluster <- 
-    aggregate(select(dat1,-City), 
-              by=list(cluster=km$cluster), 
-              mean) %>%
-    round(2)
-
-# 截取字段名前3个字母，优化排版
-names(dat1_cluster) <- names(dat1_cluster) %>% 
-    map_chr(~ substr(.,1,3))
-
-dat1_cluster
-```
-由聚类结果可知：
-
-*   高AQI城市
-    *   类型1(数量少)：GDP极高、降水量高、温度适中
-    *   类型2(数量多)：GDP低。。。。
-
-回顾相关系数热力图得知，“纬度与降雨量”与AQI存在较强的负相关性而与GDP弱相关，且考虑到降雨对空气质量有较大的影响，故我们可以控制“降雨量”区间变量再次对“AQI~GDP”相关性进行分析:
-
-*   控制“降雨量”变量后，降雨量低于平均的城市群AQI与GDP出现了较强的正相关性
-
-```{r plt_aqi_gdp2}
-dat1 %>% 
-    ggplot(aes(x = GDP, y = AQI, color = Precipitation))+
-    geom_point(alpha = 1)+
-    geom_smooth(se = FALSE, 
-                color = "black", 
-                lty = 4)+
-    geom_smooth(data = filter(dat1, Precipitation <= mean(Precipitation)), 
-                se = FALSE, 
-                color = "#023858")+
-    geom_smooth(data = filter(dat1, Precipitation > mean(Precipitation)), 
-                se = FALSE, 
-                color = "#74a9cf")+
-    labs(
-        title = "不同降雨量水平下，城市AQI~GDP分布"
-    )
-```
-
-## 检验
-
-
-```{r plt_jetter}
-dat1 %>% 
-    mutate(is_Coastal = ifelse(Coastal == 1, "沿海", "非沿海")) %>% 
-    ggplot(aes(x = is_Coastal, 
-               y = AQI, 
-               color = is_Coastal))+
-    geom_jitter(width = .3)+
-    stat_summary(
-        fun = "median",
-        fun.min = \(x) quantile(x, probs = .05),
-        fun.max = \(x) quantile(x, probs = .95),
-        color = "red",
-        size = 1.2
-    )
-    
-```
-
-
-对两组样本进行正态性检验，结果：
-```{r shapiro}
-# dat1 %>% 
-#     count(Coastal)
-
-# 正态性检验
-dat1_nest<- dat1 %>% 
-    select(Coastal, AQI) %>% 
-    nest(data = AQI) %>% 
-    mutate(
-        shapiro.val = purrr::map_dbl(data, ~ shapiro.test(.x$AQI)[["p.value"]])
-    )
+dat %>% 
+    filter(region_display == "South_East Asia",
+           gho_display == "Life expectancy at birth (years)",
+           year_code %in% c("1990","2013")) %>% 
+    group_by(country_display, year_code) %>% 
+    summarise(
+        m_value = mean(value)
+    ) %>% 
+    ungroup() %>%
+ 
+    ggplot(aes(x = m_value, y = country_display, color = year_code))+
+    geom_point()+
+    geom_line()
     
 
-dat1_nest %>% select(-data)
+
 ```
 
-```{r boostrap}
-diff_vec <- 1:1000 %>% 
-    purrr::map_dbl({
-        ~ dat1 %>% 
-            group_by(Coastal) %>% 
-            sample_n(size = 30, replace = TRUE) %>% 
-            summarise(mu = mean(AQI)) %>% 
-            ungroup() %>%
-            summarise(diff = diff(mu)) %>% 
-            pull(diff)
-    })
 
-pval1 <- length(which(diff_vec > 0)) / length(diff_vec)
-
-NULL %>% 
-    ggplot(aes(diff_vec))+
-    geom_density(fill = "lightblue", col = "blue", alpha = .3)+
-    geom_vline(xintercept = 0, lty = 4, col = "salmon")+
-    geom_text(aes(
-        x = 0,
-        y = .02,
-        label = format(pval1, digits = 2)
-    ), col = "white", 
-    size = 11
-    )+
-    labs(
-        x = "",
-        title = "沿海与非沿海城市AQI指数差分布",
-        subtitle = "diff = 沿海城市AQI-非沿海AQI"
-    )
-    
-```
 
 
 
