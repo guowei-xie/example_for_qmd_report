@@ -97,37 +97,38 @@ rbind(diff_sort_top3, diff_sort_last3) %>% gt()
 
 3. 不区分性别，针对东亚区域 (South_East Asia) ，对比男女在 出生时预期寿命 以及 60岁时预期寿命 的差距。（请尝试利用图表表达，如图1）
 ```{r plt1}
+# 计算gho_display分组均值，用于参考线
 m_dat <- dat %>% 
     filter(region_display == "South_East Asia",
-           gho_display %in% c("Life expectancy at birth (years)", "Life expectancy at age 60 (years)")) %>% 
+        gho_display %in% c("Life expectancy at birth (years)", "Life expectancy at age 60 (years)"),
+        sex_display %in% c("Female", "Male"))%>% 
     group_by(gho_display) %>% 
-    summarise(m_value = mean(value, na.rm = TRUE))
+    summarise(m_gho_value = mean(value, na.rm = TRUE))
 
 
 dat %>% 
-    filter(region_display == "South_East Asia",
-           gho_display %in% c("Life expectancy at birth (years)", "Life expectancy at age 60 (years)")) %>% 
-    group_by(country_display, gho_display) %>% 
-    summarise(
-        Female = mean(ifelse(sex_code == "FMLE", value, NA), na.rm = TRUE),
-        Male = mean(ifelse(sex_code == "MLE", value, NA), na.rm = TRUE),
+    filter(
+        region_display == "South_East Asia",
+        gho_display %in% c("Life expectancy at birth (years)", "Life expectancy at age 60 (years)"),
+        sex_display %in% c("Female", "Male")
     ) %>% 
-    ungroup() %>% 
+    group_by(country_display ,gho_display, sex_display) %>% 
+    summarise(m_value = mean(value, na.rm = TRUE)) %>% 
+    ungroup %>% 
     left_join(m_dat, by = "gho_display") %>% 
-    ggplot() +
-    geom_vline(xintercept = 1, linetype='solid')+
-    geom_vline(xintercept = 1.5, linetype='solid')+
-    geom_point(aes(x = 1, y = Female), fill = "lightblue", color = "grey",size = 2, shape = 21)+
-    geom_point(aes(x = 1.5, y = Male), fill = "lightblue",color = "grey",size = 2, shape = 21)+
-    geom_segment(aes(x=1, xend=1.5, y = Female, yend= Male), size = .3, color = "grey")+
-    geom_text(aes(x = 1.05, y = 1, label = "Female"))+
-    geom_text(aes(x = 1.55, y = 1, label = "Male")) +
-    geom_hline(aes(yintercept = m_value), lty = 4, col = "salmon")+
+    ggplot(aes(x = sex_display, y = m_value))+
+    geom_point(shape = 21, fill = "lightblue", size = 2,  color = "grey")+
+    geom_line(aes(group = country_display), color = "grey")+
+    geom_hline(aes(yintercept = m_gho_value),lty = 4, col = "salmon")+
     facet_grid(~ gho_display)+
-     labs(
-        x = ""
-    )+
-    theme(axis.title.x = element_blank())
+    labs(
+        x = "",
+        y = ""
+    )
+    
+    
+    
+
 
 ```
 
@@ -154,18 +155,17 @@ dat %>%
     ungroup() %>%
     left_join(m_dat, by = "year_code") %>% 
     ggplot(aes(x = m_value, y = country_display, fill = as.factor(year_code)))+
-    geom_point(size = 2, shape = 21)+
-    geom_line(aes(group = country_display))+
+    geom_point(size = 3, shape = 21)+
+    geom_line(aes(group = country_display), arrow = arrow(length = unit(0.075, "inches")))+
     geom_vline(aes(xintercept = m_value_year), lty = 4, col = "salmon")+
     labs(
         x = "",
         y = "",
         title = "Life Expectancy Bir th"
     )+
-    theme(legend.title = element_blank())
+    theme(legend.title = element_blank(),
+          legend.position = "top")
     
-
-
 ```
 
 
