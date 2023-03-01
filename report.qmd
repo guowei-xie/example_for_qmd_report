@@ -22,10 +22,6 @@ editor_options:
  
 ---
 
-
-
-
-
 ```{r setup}
 library(tidyverse)
 library(gt)
@@ -41,13 +37,8 @@ values <- as.data.frame(values[["data"]])
 
 
 dat <- codes %>% 
-    left_join(displays, by = c("gho_code" = "gho_code",
-                               "country_code" = "country_code",
-                               "region_code" = "region_code",
-                               "sex_code" = "sex_code",
-                               "world_bank_income_group_group_code" = "world_bank_income_group_group_code"
-                               )) %>%
-    left_join(values, by = c("id" = "id"))
+    left_join(displays) %>%
+    left_join(values, by = "id")
 ```
 
 1. 根据最新数据（2013），统计各个地区 (region) 的 60岁时预期寿命区间 
@@ -117,19 +108,14 @@ dat %>%
     ungroup %>% 
     left_join(m_dat, by = "gho_display") %>% 
     ggplot(aes(x = sex_display, y = m_value))+
-    geom_point(shape = 21, fill = "lightblue", size = 2,  color = "grey")+
-    geom_line(aes(group = country_display), color = "grey")+
+    geom_point(shape = 21, fill = "lightblue", size = 2)+
+    geom_line(aes(group = country_display))+
     geom_hline(aes(yintercept = m_gho_value),lty = 4, col = "salmon")+
     facet_grid(~ gho_display)+
     labs(
         x = "",
         y = ""
     )
-    
-    
-    
-
-
 ```
 
 4. 扩展第三道题目，比较1990年至2013年间各个东亚国家在出生时预期寿命方面的进步情况（如图2）。
@@ -154,18 +140,23 @@ dat %>%
     ) %>% 
     ungroup() %>%
     left_join(m_dat, by = "year_code") %>% 
-    ggplot(aes(x = m_value, y = country_display, fill = as.factor(year_code)))+
+    ggplot(aes(x = m_value, 
+               y = country_display, 
+               fill = as.factor(year_code)))+
     geom_point(size = 3, shape = 21)+
-    geom_line(aes(group = country_display), arrow = arrow(length = unit(0.075, "inches")))+
-    geom_vline(aes(xintercept = m_value_year), lty = 4, col = "salmon")+
+    geom_line(aes(group = country_display), 
+              arrow = arrow(length = unit(0.075, "inches")))+
+    geom_vline(aes(xintercept = m_value_year), 
+               lty = 4, col = "salmon")+
     labs(
         x = "",
         y = "",
         title = "Life Expectancy Bir th"
     )+
-    theme(legend.title = element_blank(),
-          legend.position = "top")
-    
+    theme(
+        legend.title = element_blank(),
+          legend.position = "top"
+        )
 ```
 
 
