@@ -100,6 +100,12 @@ rbind(diff_sort_top3, diff_sort_last3) %>% gt()
 
 3. 不区分性别，针对东亚区域 (South_East Asia) ，对比男女在 出生时预期寿命 以及 60岁时预期寿命 的差距。（请尝试利用图表表达，如图1）
 ```{r plt1}
+m_dat <- dat %>% 
+    filter(region_display == "South_East Asia",
+           gho_display %in% c("Life expectancy at birth (years)", "Life expectancy at age 60 (years)")) %>% 
+    group_by(gho_display) %>% 
+    summarise(m_value = mean(value, na.rm = TRUE))
+
 
 dat %>% 
     filter(region_display == "South_East Asia",
@@ -110,18 +116,21 @@ dat %>%
         Male = mean(ifelse(sex_code == "MLE", value, NA), na.rm = TRUE),
     ) %>% 
     ungroup() %>% 
+    left_join(m_dat, by = "gho_display") %>% 
     ggplot() +
     geom_vline(xintercept = 1, linetype='solid')+
     geom_vline(xintercept = 2, linetype='solid')+
-    geom_point(aes(x = 1, y = Female), color = "lightblue")+
-    geom_point(aes(x = 2, y = Male), color = "lightblue")+
+    geom_point(aes(x = 1, y = Female), color = "lightblue", size = 2)+
+    geom_point(aes(x = 2, y = Male), color = "lightblue", size = 2)+
     geom_segment(aes(x=1, xend=2, y = Female, yend= Male), size = .3)+
     geom_text(aes(x = 1, y = 1, label = "Female"))+
     geom_text(aes(x = 2, y = 1, label = "Male")) +
+    geom_hline(aes(yintercept = m_value), lty = 4, col = "salmon")+
     facet_grid(~ gho_display)+
      labs(
         x = ""
-    )
+    )+
+    theme(axis.title.x = element_blank())
 
 ```
 
@@ -140,7 +149,10 @@ dat %>%
  
     ggplot(aes(x = m_value, y = country_display, color = year_code))+
     geom_point()+
-    geom_line()
+    geom_line()+
+    labs(
+        x = ""
+    )
     
 
 
