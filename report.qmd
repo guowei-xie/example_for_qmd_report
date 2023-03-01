@@ -1,5 +1,5 @@
 ---
-title: "城市经济发展与环境污染数据探索分析"
+title: "数据探索分析"
 author: 谢国伟
 execute: 
     echo: false
