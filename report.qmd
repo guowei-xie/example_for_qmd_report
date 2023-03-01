@@ -29,9 +29,6 @@ editor_options:
 ```{r setup}
 library(tidyverse)
 library(gt)
-library(reshape2)
-library(factoextra)
-library(fmsb)
 library(jsonlite)
 ```
 
@@ -120,9 +117,9 @@ dat %>%
     ggplot() +
     geom_vline(xintercept = 1, linetype='solid')+
     geom_vline(xintercept = 2, linetype='solid')+
-    geom_point(aes(x = 1, y = Female), color = "lightblue", size = 2)+
-    geom_point(aes(x = 2, y = Male), color = "lightblue", size = 2)+
-    geom_segment(aes(x=1, xend=2, y = Female, yend= Male), size = .3)+
+    geom_point(aes(x = 1, y = Female), fill = "lightblue", color = "grey",size = 2, shape = 21)+
+    geom_point(aes(x = 2, y = Male), fill = "lightblue",color = "grey",size = 2, shape = 21)+
+    geom_segment(aes(x=1, xend=2, y = Female, yend= Male), size = .3, color = "grey")+
     geom_text(aes(x = 1, y = 1, label = "Female"))+
     geom_text(aes(x = 2, y = 1, label = "Male")) +
     geom_hline(aes(yintercept = m_value), lty = 4, col = "salmon")+
